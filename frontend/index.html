@@ -8,20 +8,47 @@
 </head>
 <body>
     <div class="container">
-        <h1>Kubernetes CronJobs</h1>
-        <div id="clusterInfo" class="cluster-info-container"></div>
+        <h1>Croniq</h1>
+        <div class="tabs">
+            <button class="tab-button active" data-tab="dashboard">Dashboard</button>
+            <button class="tab-button" data-tab="cronjobs">CronJobs</button>
+            <button class="tab-button" data-tab="jobs">Jobs</button>
+        </div>
+        <div id="dashboard" class="tab-content active">
+            <div id="clusterInfo" class="cluster-info-container"></div>
+            <div class="dashboard-stats">
+                <div id="cronJobStats" class="stat-card"></div>
+                <div id="jobStats" class="stat-card"></div>
+            </div>
+        </div>
+        <div id="cronjobs" class="tab-content">
+            <table id="cronJobTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Namespace</th>
+                        <th>Schedule</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="cronJobList"></tbody>
+            </table>
+        </div>
+        <div id="jobs" class="tab-content">
+            <table id="jobTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Namespace</th>
+                        <th>Status</th>
+                        <th>Started</th>
+                        <th>Completed</th>
+                    </tr>
+                </thead>
+                <tbody id="jobList"></tbody>
+            </table>
+        </div>
         <div id="error" class="error"></div>
-        <table id="cronJobTable">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Namespace</th>
-                    <th>Schedule</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="cronJobList"></tbody>
-        </table>
         <div id="debug" class="debug-info"></div>
     </div>
     <script type="module" src="src/main.ts"></script>

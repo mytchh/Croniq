@@ -11,7 +11,7 @@ import (
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 		if r.Method == "OPTIONS" {
@@ -31,6 +31,8 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/api/cronjobs", corsMiddleware(cronJobHandler))
 	mux.HandleFunc("/api/cluster-info", corsMiddleware(http.HandlerFunc(cronJobHandler.HandleClusterInfo)).ServeHTTP)
+	mux.HandleFunc("/api/jobs", corsMiddleware(http.HandlerFunc(cronJobHandler.HandleJobs)).ServeHTTP)
+	mux.HandleFunc("/api/stats", corsMiddleware(http.HandlerFunc(cronJobHandler.HandleStats)).ServeHTTP)
 
 	server := &http.Server{
 		Addr:    ":8080",

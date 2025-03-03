@@ -1,16 +1,18 @@
-import { CronJob, CronJobResponse, ClusterInfo } from './types.ts';
+import { CronJob, CronJobResponse, ClusterInfo, JobStats, JobResponse, Job } from './types';
 
 class CronJobUI {
     private tableBody: HTMLElement;
     private errorDiv: HTMLElement;
     private clusterInfoDiv: HTMLElement;
     private debugDiv: HTMLElement;
+    private activeTab: string = 'dashboard';
 
     constructor() {
         this.tableBody = document.getElementById('cronJobList') as HTMLElement;
         this.errorDiv = document.getElementById('error') as HTMLElement;
         this.clusterInfoDiv = document.getElementById('clusterInfo') as HTMLElement;
         this.debugDiv = document.getElementById('debug') as HTMLElement;
+        this.initTabs();
         this.init();
     }
 
@@ -25,19 +27,24 @@ class CronJobUI {
 
     private async fetchClusterInfo(): Promise<void> {
         try {
-            const response = await fetch('http://localhost:8080/api/cluster-info');
-            this.log(`Cluster info response status: ${response.status}`);
-            
+            const response = await fetch('http://localhost:8080/api/cluster-info', {
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
+            console.log('Cluster info response:', response.status);
             if (!response.ok) {
                 const text = await response.text();
-                throw new Error(`Failed to fetch cluster info: ${response.status} ${text}`);
+                console.error('Error response:', text);
+                throw new Error('Failed to fetch cluster info');
             }
-            
             const info: ClusterInfo = await response.json();
-            this.log(`Cluster info: ${JSON.stringify(info, null, 2)}`);
+            console.log('Cluster info received:', info);
             this.renderClusterInfo(info);
         } catch (err) {
-            this.showError(`Cluster info error: ${err instanceof Error ? err.message : String(err)}`);
+            console.error('Fetch error:', err);
+            this.showError(err instanceof Error ? err.message : 'An error occurred');
         }
     }
 
@@ -53,7 +60,12 @@ class CronJobUI {
 
     private async fetchAndDisplayCronJobs(): Promise<void> {
         try {
-            const response = await fetch('http://localhost:8080/api/cronjobs');
+            const response = await fetch('http://localhost:8080/api/cronjobs', {
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
             this.log(`CronJobs response status: ${response.status}`);
             
             if (!response.ok) {
@@ -98,6 +110,134 @@ class CronJobUI {
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    }
+
+    private initTabs(): void {
+        const tabs = document.querySelectorAll('.tab-button');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const target = e.target as HTMLElement;
+                const tabName = target.dataset.tab;
+                if (tabName) {
+                    this.switchTab(tabName);
+                }
+            });
+        });
+    }
+
+    private switchTab(tabName: string): void {
+        // Update buttons
+        document.querySelectorAll('.tab-button').forEach(tab => {
+            tab.classList.toggle('active', tab.getAttribute('data-tab') === tabName);
+        });
+
+        // Update content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.toggle('active', content.id === tabName);
+        });
+
+        this.activeTab = tabName;
+        this.refreshActiveTab();
+    }
+
+    private async refreshActiveTab(): Promise<void> {
+        switch (this.activeTab) {
+            case 'dashboard':
+                await this.fetchClusterInfo();
+                await this.fetchStats();
+                break;
+            case 'cronjobs':
+                await this.fetchAndDisplayCronJobs();
+                break;
+            case 'jobs':
+                await this.fetchAndDisplayJobs();
+                break;
+        }
+    }
+
+    private async fetchStats(): Promise<void> {
+        try {
+            const response = await fetch('http://localhost:8080/api/stats', {
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch stats');
+            }
+            
+            const stats: JobStats = await response.json();
+            this.renderStats(stats);
+        } catch (err) {
+            this.showError(err instanceof Error ? err.message : 'An error occurred');
+        }
+    }
+
+    private renderStats(stats: JobStats): void {
+        const cronJobStatsDiv = document.getElementById('cronJobStats');
+        const jobStatsDiv = document.getElementById('jobStats');
+        
+        if (cronJobStatsDiv) {
+            cronJobStatsDiv.innerHTML = `
+                <h3>CronJobs</h3>
+                <p>Total: ${stats.totalCronJobs}</p>
+                <p>Active: ${stats.activeCronJobs}</p>
+            `;
+        }
+        
+        if (jobStatsDiv) {
+            jobStatsDiv.innerHTML = `
+                <h3>Jobs</h3>
+                <p>Total: ${stats.totalJobs}</p>
+                <p>Running: ${stats.runningJobs}</p>
+                <p>Succeeded: ${stats.succeededJobs}</p>
+                <p>Failed: ${stats.failedJobs}</p>
+            `;
+        }
+    }
+
+    private async fetchAndDisplayJobs(): Promise<void> {
+        try {
+            const response = await fetch('http://localhost:8080/api/jobs', {
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch jobs');
+            }
+            
+            const data: JobResponse = await response.json();
+            this.renderJobs(data.items || []);
+        } catch (err) {
+            this.showError(err instanceof Error ? err.message : 'An error occurred');
+        }
+    }
+
+    private renderJobs(jobs: Job[]): void {
+        const jobList = document.getElementById('jobList');
+        if (!jobList) return;
+
+        jobList.innerHTML = jobs.map(job => `
+            <tr>
+                <td>${this.escapeHtml(job.metadata.name)}</td>
+                <td>${this.escapeHtml(job.metadata.namespace)}</td>
+                <td>${this.getJobStatus(job)}</td>
+                <td>${job.status.startTime ? new Date(job.status.startTime).toLocaleString() : 'N/A'}</td>
+                <td>${job.status.completionTime ? new Date(job.status.completionTime).toLocaleString() : 'N/A'}</td>
+            </tr>
+        `).join('');
+    }
+
+    private getJobStatus(job: Job): string {
+        if (job.status.active > 0) return 'Running';
+        if (job.status.succeeded > 0) return 'Succeeded';
+        if (job.status.failed > 0) return 'Failed';
+        return 'Pending';
     }
 }
 

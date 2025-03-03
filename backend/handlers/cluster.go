@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"net/http"
+
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type ClusterInfo struct {
@@ -34,8 +36,19 @@ func (h *CronJobHandler) HandleClusterInfo(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Get the current context name
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	configOverrides := &clientcmd.ConfigOverrides{}
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+
+	rawConfig, err := kubeConfig.RawConfig()
+	if err != nil {
+		sendJSONError(w, "Failed to get raw config", http.StatusInternalServerError)
+		return
+	}
+
 	info := ClusterInfo{
-		Name:          config.Host,
+		Name:          rawConfig.CurrentContext,
 		ServerAddress: config.Host,
 		Version:       version.String(),
 	}
